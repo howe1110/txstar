@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <math.h>
 #include "tx_env.h"
+#include "startmessage.pb.h"
 
 StarNode::StarNode(/* args */)
 {
@@ -20,6 +21,17 @@ StarNode &StarNode::instance()
 
 void StarNode::handlemessage(tlinkptr plink, ptxmsg pMsg)
 {
+    switch (pMsg->msgid)
+    {
+    case successor_req:
+        handleSuccessorReq(plink, pMsg);
+        break;
+    case successor_rsp:
+        handleSuccessorRsp(pMsg);
+        break;
+    default:
+        break;
+    }
 }
 
 void StarNode::Start()
@@ -39,27 +51,95 @@ void StarNode::StartJoin(const std::string &server, const std::string &port)
     }
 }
 
-void StarNode::handleSuccessorReq(const txmsg *msg)
+void StarNode::handleSuccessorReq(tlinkptr plink, const txmsg *msg)
 {
-    IDtype id = 0;
-
-    if (INVALID_NODEID == findSuccessor(id))
+    txstar::successorReq req;
+    req.ParseFromArray(msg->data, msg->msglen);
+    IDtype id = req.node().nodeid();
+    std::string addr = req.node().address();
+    std::string port = req.node().port();
+    NodeAddr naddr(id, addr, port);
+    NodeAddr successor = findSuccessor(id);
+    if (INVALID_NODEID == successor.id)
     {
-        /* code */
+        NodeAddr addr = getClosestNodeInFingerTable(id); //获取最近的节点
+        //向下个节点发起请求
+        Send2Node(addr, msg);
+        return;
     }
-    
+    txstar::nodeinfo n;
+
+    n.set_nodeid(id);
+    n.set_address(_localaddr.address);
+    n.set_port(_localaddr.port);
+    txstar::successorRsp rsp;
+    rsp.set_allocated_node(&n);
+    size_t len = rsp.ByteSizeLong();
+    char *buf = new char[len];
+
+    if (!rsp.SerializeToArray(buf, len))
+    {
+        return;
+    }
+    Send2Node(naddr, buf, successor_rsp, len);
 }
 
-void StarNode::handleJoinReq(const txmsg *msg)
+void StarNode::handleJoinReq(tlinkptr plink, const txmsg *msg)
 {
 }
 
-void StarNode::handleStabilizeReq(const txmsg *msg)
+void StarNode::handleStabilizeReq(tlinkptr plink, const txmsg *msg)
 {
+}
+
+void StarNode::handleSuccessorRsp(const txmsg *msg)
+{
+    txstar::successorRsp rsp;
+    rsp.ParseFromArray(msg->data, msg->msglen);
+}
+
+void StarNode::Send2Node(NodeAddr addr, const void *buf, const txIdType mt, const size_t datalen)
+{
+    txcomclient client;
+    if(client.Connect(addr.address, addr.port))
+    {
+        logerr("Connect to node {%s:%s} failed.", addr.address, addr.port);
+        return;
+    }
+    if(client.Send(buf, mt, datalen))
+    {
+        logerr("Send to node {%s:%s} failed.", addr.address, addr.port);
+    }
+}
+
+void StarNode::Send2Node(NodeAddr addr, const txmsg *msg)
+{
+    Send2Node(addr, msg->data, msg->msgid, msg->msglen);
 }
 
 void StarNode::join(IDtype id)
 {
+}
+
+void StarNode::RequestSuccessor(std::string addr, std::string port)
+{
+    txstar::nodeinfo n;
+    n.set_nodeid(_id);
+    n.set_address(_localaddr.address);
+    n.set_port(_localaddr.port);
+    txstar::successorReq req;
+    req.set_allocated_node(&n);
+
+    size_t len = req.ByteSizeLong();
+    char *buf = new char[len];
+
+    if (!req.SerializeToArray(buf, len))
+    {
+        return;
+    }
+    txcomclient client;
+    client.Connect(addr, port);
+    client.Send(buf, successor_req, len);
 }
 
 void StarNode::exit()
@@ -76,24 +156,24 @@ void StarNode::Show()
     Trace("Predecessor: {%u}, Successor: {%s}", _predecessor, _successor);
 }
 
-IDtype StarNode::findSuccessor(IDtype id)
+    
+NodeAddr StarNode::findSuccessor(IDtype id)
 {
-    logtrace("Handle successor request.");
-    if (_id < id && id < _successor)
+    if (_id < id && id < _successor.id)
     {
         return _successor;
     }
-    else if (_id > _successor) //ring is end. response this node id.
+    else if (_id > _successor.id) //ring is end. response this node id.
     {
         return _successor;
     }
-    else if (_id == _successor) //p2p network only have one node.
+    else if (_id == _successor.id) //p2p network only have one node.
     {
         return _successor;
     }
-    else//not found.
+    else //not found.
     {
-        return INVALID_NODEID;
+        return NodeAddr();
     }
 }
 
@@ -114,31 +194,31 @@ void StarNode::fixFingerTable()
         }
 
         _fingertable[i] = findSuccessor(next);
-        if (_fingertable[i] == _id) //第一个后继节点是自己的
+        if (_fingertable[i].id == _id) //第一个后继节点是自己的
         {
             break;
         }
     }
     for (int i = i + 1; i < RING_BIT_SIZE; i++) //后续每一个后继节点都是此节点
     {
-        _fingertable[i] = _id;
+        _fingertable[i] = _localaddr;
     }
 }
 
-IDtype StarNode::getClosestNodeInFingerTable(IDtype id)
+NodeAddr StarNode::getClosestNodeInFingerTable(IDtype id)
 {
     for (int i = RING_BIT_SIZE - 1; i >= 0; i--) //倒序查找，先大范围查找。
     {
-        if (_fingertable[i] == INVALID_NODEID)
+        if (_fingertable[i].id == INVALID_NODEID)
         {
             continue;
         }
-        if (_fingertable[i] == _id)
+        if (_fingertable[i].id == _id)
         {
             /* code */
             continue;
         }
-        if (id < _fingertable[i] && _fingertable[i] < _id)
+        if (id < _fingertable[i].id && _fingertable[i].id < _id)
         {
             return _fingertable[i];
         }

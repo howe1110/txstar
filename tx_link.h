@@ -53,7 +53,7 @@ public:
     virtual ~tlink();
 
 public:
-    int SendData(const void *buf, const msgtype mt, const size_t datalen);
+    int SendData(const void *buf, const txIdType mt, const size_t datalen);
 
 public:
     int Recv();

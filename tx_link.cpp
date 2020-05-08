@@ -119,7 +119,7 @@ int tlink::Send()
     return iResult;
 }
 
-int tlink::SendData(const void *buf, const msgtype mt, const size_t datalen)
+int tlink::SendData(const void *buf, const txIdType mt, const size_t datalen)
 {
     if (buf == nullptr)
     {
@@ -147,7 +147,6 @@ int tlink::SendData(const void *buf, const msgtype mt, const size_t datalen)
 }
 
 //
-
 bool tlink::Parse(ptxmsg *ppMsg, size_t &len)
 {
     size_t datalen = &_recvbuf[0] + _recvbufpos - _revdata;

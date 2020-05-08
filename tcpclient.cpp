@@ -90,7 +90,7 @@ bool txcomclient::Connect(const std::string &server, const std::string &port)
     return true;
 }
 
-txcomresponse txcomclient::Request(const void *buf, const msgtype mt, const size_t datalen)
+txcomresponse txcomclient::Request(const void *buf, const txIdType mt, const size_t datalen)
 {
     size_t len = 0;
 
@@ -113,7 +113,7 @@ txcomresponse txcomclient::Request(const void *buf, const msgtype mt, const size
     return txcomresponse(TXCOMRESPERR, pmsg);;
 }
 
-bool txcomclient::Send(const void *buf, const msgtype mt, const size_t datalen)
+bool txcomclient::Send(const void *buf, const txIdType mt, const size_t datalen)
 {
     size_t len = 0;
     if(_plink == nullptr)

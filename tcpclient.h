@@ -39,6 +39,6 @@ public:
 
 public:
     bool Connect(const std::string &server, const std::string &port);
-    txcomresponse Request(const void *buf, const msgtype mt, const size_t datalen);
-    bool Send(const void *buf, const msgtype mt, const size_t datalen);
+    txcomresponse Request(const void *buf, const txIdType mt, const size_t datalen);
+    bool Send(const void *buf, const txIdType mt, const size_t datalen);
 };

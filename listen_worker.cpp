@@ -10,6 +10,11 @@ listen_worker::listen_worker(/* args */) : _listen_port("55555"), _comworker(nul
 {
 }
 
+listen_worker::listen_worker(std::string& addr, std::string& port) : _listen_port(port), _comworker(nullptr), _lsocket(INVALID_SOCKET), tx_worker_base("listen_worker")
+{
+}
+
+
 listen_worker::~listen_worker()
 {
 }
@@ -17,6 +22,11 @@ listen_worker::~listen_worker()
 void listen_worker::setcommwoker(comworker *cwk)
 {
     _comworker = cwk;
+}
+
+void listen_worker::set_port(std::string& port)
+{
+    _listen_port = port;
 }
 
 void listen_worker::handleconnect(int st)

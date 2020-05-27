@@ -34,11 +34,11 @@ public:
         return pMsg;
     }
     
-    static txmsg *Clone(txmsg *p)
+    static txmsg *Clone(const txmsg *p)
     {
         if (p == nullptr)
         {
-            return p;
+            return nullptr;
         }
         int len = sizeof(txmsg) + p->msglen;
         txmsg *pMsg = (txmsg *)malloc(len);

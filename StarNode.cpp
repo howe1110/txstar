@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <math.h>
 #include "tx_env.h"
-#include "startmessage.pb.h"
+#include "proto/starmessage.pb.h"
 
 StarNode::StarNode(/* args */)
 {
@@ -41,14 +41,15 @@ void StarNode::Start()
     _listener.start(); //启动侦听功能。
 }
 
+void StarNode::Stop()
+{
+    _listener.stop();
+    stop();
+}
+
 void StarNode::StartJoin(const std::string &server, const std::string &port)
 {
-    txcomclient client;
-    bool bRet = client.Connect(server, port);
-    if (!bRet)
-    {
-        return;
-    }
+    RequestSuccessor(server, port);
 }
 
 void StarNode::handleSuccessorReq(tlinkptr plink, const txmsg *msg)
@@ -56,17 +57,49 @@ void StarNode::handleSuccessorReq(tlinkptr plink, const txmsg *msg)
     txstar::successorReq req;
     req.ParseFromArray(msg->data, msg->msglen);
     IDtype id = req.node().nodeid();
-    std::string addr = req.node().address();
-    std::string port = req.node().port();
+    std::string addr = plink->PeerServer();
+    std::string port = std::to_string(plink->PeerPort());
     NodeAddr naddr(id, addr, port);
     NodeAddr successor = findSuccessor(id);
     if (INVALID_NODEID == successor.id)
     {
+        txstar::nodeinfo n;
+        n.set_nodeid(_id);
+        n.set_address(_localaddr.address);
+        n.set_port(_localaddr.port);
+        txstar::successorReq req;
+        req.set_allocated_node(&n);
+
+        size_t len = req.ByteSizeLong();
+        char *buf = new char[len];
+
+        if (!req.SerializeToArray(buf, len))
+        {
+            return;
+        }
         NodeAddr addr = getClosestNodeInFingerTable(id); //获取最近的节点
         //向下个节点发起请求
-        Send2Node(addr, msg);
-        return;
+        Send2Node(addr, buf, successor_req2, len);
     }
+    else
+    {
+        txstar::nodeinfo n;
+
+        n.set_nodeid(id);
+        n.set_address(_localaddr.address);
+        n.set_port(_localaddr.port);
+        txstar::successorRsp rsp;
+        rsp.set_allocated_node(&n);
+        size_t len = rsp.ByteSizeLong();
+        char *buf = new char[len];
+
+        if (!rsp.SerializeToArray(buf, len))
+        {
+            return;
+        }
+        Send2Node(naddr, buf, successor_nty, len);
+    }
+
     txstar::nodeinfo n;
 
     n.set_nodeid(id);
@@ -81,7 +114,60 @@ void StarNode::handleSuccessorReq(tlinkptr plink, const txmsg *msg)
     {
         return;
     }
-    Send2Node(naddr, buf, successor_rsp, len);
+    plink->SendData(buf, successor_rsp, len);
+}
+
+void StarNode::handleSuccessorReq2(tlinkptr plink, const txmsg *msg)
+{
+    txstar::successorReq req;
+    req.ParseFromArray(msg->data, msg->msglen);
+    IDtype id = req.node().nodeid();
+    std::string addr = req.node().address();
+    std::string port = req.node().port();
+    NodeAddr naddr(id, addr, port);
+    NodeAddr successor = findSuccessor(id);
+    if (INVALID_NODEID == successor.id)
+    {
+        NodeAddr addr = getClosestNodeInFingerTable(id); //获取最近的节点
+        //向下个节点发起请求
+        txmsg *msg2 = txmsg::Clone(msg);
+        msg2->msgid = successor_req2;
+        Send2Node(addr, msg2);
+    }
+    else
+    {
+        txstar::nodeinfo n;
+
+        n.set_nodeid(id);
+        n.set_address(_localaddr.address);
+        n.set_port(_localaddr.port);
+        txstar::successorRsp rsp;
+        rsp.set_allocated_node(&n);
+        size_t len = rsp.ByteSizeLong();
+        char *buf = new char[len];
+
+        if (!rsp.SerializeToArray(buf, len))
+        {
+            return;
+        }
+        Send2Node(naddr, buf, successor_nty, len);
+    }
+
+    txstar::nodeinfo n;
+
+    n.set_nodeid(id);
+    n.set_address(_localaddr.address);
+    n.set_port(_localaddr.port);
+    txstar::successorRsp rsp;
+    rsp.set_allocated_node(&n);
+    size_t len = rsp.ByteSizeLong();
+    char *buf = new char[len];
+
+    if (!rsp.SerializeToArray(buf, len))
+    {
+        return;
+    }
+    plink->SendData(buf, successor_rsp, len);
 }
 
 void StarNode::handleJoinReq(tlinkptr plink, const txmsg *msg)
@@ -98,15 +184,21 @@ void StarNode::handleSuccessorRsp(const txmsg *msg)
     rsp.ParseFromArray(msg->data, msg->msglen);
 }
 
+void StarNode::handleSuccessorNty(const txmsg *msg)
+{
+    txstar::successorRsp rsp;
+    rsp.ParseFromArray(msg->data, msg->msglen);
+}
+
 void StarNode::Send2Node(NodeAddr addr, const void *buf, const txIdType mt, const size_t datalen)
 {
     txcomclient client;
-    if(client.Connect(addr.address, addr.port))
+    if (client.Connect(addr.address, addr.port))
     {
         logerr("Connect to node {%s:%s} failed.", addr.address, addr.port);
         return;
     }
-    if(client.Send(buf, mt, datalen))
+    if (client.Send(buf, mt, datalen))
     {
         logerr("Send to node {%s:%s} failed.", addr.address, addr.port);
     }
@@ -139,7 +231,7 @@ void StarNode::RequestSuccessor(std::string addr, std::string port)
     }
     txcomclient client;
     client.Connect(addr, port);
-    client.Send(buf, successor_req, len);
+    txcomresponse psp = client.Request(buf, successor_req, len);
 }
 
 void StarNode::exit()
@@ -156,7 +248,6 @@ void StarNode::Show()
     Trace("Predecessor: {%u}, Successor: {%s}", _predecessor, _successor);
 }
 
-    
 NodeAddr StarNode::findSuccessor(IDtype id)
 {
     if (_id < id && id < _successor.id)

@@ -50,6 +50,7 @@ private:
 
 public:
     void Start();
+    void Stop();
 
 public:
     void Show();
@@ -60,11 +61,13 @@ public:
 
 public:
     virtual void handleSuccessorReq(tlinkptr plink, const txmsg *msg);
+    virtual void handleSuccessorReq2(tlinkptr plink, const txmsg *msg);
     virtual void handleJoinReq(tlinkptr plink, const txmsg *msg);
     virtual void handleStabilizeReq(tlinkptr plink, const txmsg *msg);
 
 private:
     void handleSuccessorRsp(const txmsg *msg);
+    void handleSuccessorNty(const txmsg *msg);
     void Send2Node(NodeAddr addr, const void *buf, const txIdType mt, const size_t datalen);
     void Send2Node(NodeAddr addr, const txmsg *msg);
 

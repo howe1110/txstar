@@ -15,6 +15,8 @@
 #include "listen_worker.cpp"
 #include "tcpclient.cpp"
 #include "tx_timer.cpp"
+#include "StarNode.cpp"
+#include "startmessage.pb.cc"
 
 using ::testing::_;
 using ::testing::AtLeast; // #1
@@ -48,6 +50,29 @@ public:
   MOCK_METHOD(int, shutdownI, (int sockfd, int how), (override));
   MOCK_METHOD(int, closesocketI, (int fd), (override));
   MOCK_METHOD(int, setsocketreuseaddr, (int fd), (override));
+};
+
+std::string getlocaladdr()
+{
+  struct addrinfo *result = nullptr, hints;
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = IPPROTO_TCP;
+  hints.ai_flags = AI_PASSIVE;
+  // Resolve the local address and port to be used by the server
+  int iResult = incInstance()->getaddrinfoI(NULL, "55555", &hints, &result);
+  if (iResult != 0)
+  {
+    return "";
+  }
+  if (result == nullptr)
+  {
+    return "";
+  }
+  struct sockaddr_in *addr = (struct sockaddr_in *)result->ai_addr;
+
+  return inet_ntoa(addr->sin_addr);
 };
 
 class tx_worker_test : public tx_worker
@@ -200,7 +225,10 @@ TEST_F(com_test, test_accept)
   std::this_thread::sleep_for(std::chrono::seconds(1));
   txcomclient client;
 
-  bool bRet = client.Connect("192.168.126.141", "55555");
+  std::string addr = getlocaladdr();
+  ASSERT_EQ(addr.empty(), false);
+
+  bool bRet = client.Connect(addr, "55555");
   ASSERT_EQ(bRet, true);
 
   int request = 123;
@@ -245,6 +273,33 @@ TEST_F(tx_timer_test, timer_event_test)
   std::this_thread::sleep_for(std::chrono::seconds(1));
   _wk.stop();
 }
+
+class tx_node_test : public ::testing::Test
+{
+public:
+  void SetUp() override
+  {
+    InitNetwork();
+    _node.Start();
+  }
+
+  void TearDown() override
+  {
+    _node.Stop();
+    RestNetwork();
+  }
+  StarNode _node;
+};
+
+TEST_F(tx_node_test, tx_req_test)
+{
+  std::string addr = getlocaladdr();
+  ASSERT_EQ(addr.empty(), false);
+
+  _node.RequestSuccessor(addr, "55555");
+}
+
+
 
 #undef private
 #undef protected

@@ -8,7 +8,7 @@ LIBPATH = -L../../../3rd/spdlog/build -L../../../3rd/googletest/googletest/build
 CFALG = -g -c
 
 $(target): $(objects)
-	g++ $(objects) $(LIBPATH) -lgmock -lgtest -lgtest_main -lpthread -g -o $@
+	g++ $(objects) $(LIBPATH) -lgmock -lgtest -lgtest_main -lpthread -lprotobuf -g -o $@
 $(objects): %.o: %.cpp
 	g++ -MMD $(INCLUDEPATH) $(CFALG) $<
 

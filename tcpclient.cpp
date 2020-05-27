@@ -1,7 +1,11 @@
 #include "tcpclient.h"
 #include "devinf.h"
 #include "tx_msg.h"
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 txcomclient::txcomclient(/* args */) : _plink(nullptr)
 {
@@ -9,7 +13,7 @@ txcomclient::txcomclient(/* args */) : _plink(nullptr)
 
 txcomclient::~txcomclient()
 {
-    if(_plink != nullptr)
+    if (_plink != nullptr)
     {
         delete _plink;
         _plink = nullptr;
@@ -25,7 +29,7 @@ bool txcomclient::Connect(const std::string &server, const std::string &port)
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
 
-    if(_plink != nullptr)
+    if (_plink != nullptr)
     {
         delete _plink;
         _plink = nullptr;
@@ -70,7 +74,7 @@ bool txcomclient::Connect(const std::string &server, const std::string &port)
         printf("Unable to connect to server!\n");
         return false;
     }
-    
+
     if (incInstance()->setsocketblock(st, false) == SOCKET_ERROR)
     {
         fprintf(stderr, "setsocketblock() failed with error %d\n", gai_strerror(errno));
@@ -78,7 +82,7 @@ bool txcomclient::Connect(const std::string &server, const std::string &port)
         return false;
     }
 
-    _plink = new tlink(st, true);
+    _plink = new tlink(st, true, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
     if (_plink == nullptr)
     {
         incInstance()->closesocketI(st);
@@ -93,8 +97,7 @@ bool txcomclient::Connect(const std::string &server, const std::string &port)
 txcomresponse txcomclient::Request(const void *buf, const txIdType mt, const size_t datalen)
 {
     size_t len = 0;
-
-    if(_plink == nullptr)
+    if (_plink == nullptr)
     {
         return txcomresponse(TXCOMRESPERR, nullptr);
     }
@@ -109,17 +112,15 @@ txcomresponse txcomclient::Request(const void *buf, const txIdType mt, const siz
     {
         return txcomresponse(TXCOMRESPOK, pmsg);
     }
-    
-    return txcomresponse(TXCOMRESPERR, pmsg);;
+    return txcomresponse(TXCOMRESPERR, pmsg);
 }
 
 bool txcomclient::Send(const void *buf, const txIdType mt, const size_t datalen)
 {
     size_t len = 0;
-    if(_plink == nullptr)
+    if (_plink == nullptr)
     {
         return false;
     }
     return _plink->SendData(buf, mt, datalen) > 0;
 }
-

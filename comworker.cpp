@@ -1,6 +1,11 @@
 #include "comworker.h"
 #include "devinf.h"
-
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include "tx_env.h"
 comworker::comworker(/* args */) : tx_worker_base("comworker")
 {
 }
@@ -23,13 +28,21 @@ void comworker::PostSocket(int st)
 void comworker::proclinkqueue()
 {
     bool result = true;
+    struct sockaddr_in peer;
+    socklen_t peer_len = sizeof(peer);
     while (result)
     {
         int st = INVALID_SOCKET;
         result = _socketqueue.read(st);
         if (result)
         {
-            tlinkptr lnk(new tlink(st, false));
+            if (getpeername(st, (struct sockaddr *)&peer, &peer_len) == -1)
+            {
+                logerr("getpeername failed.");
+                continue;
+            }
+
+            tlinkptr lnk(new tlink(st, false, inet_ntoa(peer.sin_addr), ntohs(peer.sin_port)));
             if (lnk.isNullPtr())
             {
                 continue;
@@ -39,7 +52,7 @@ void comworker::proclinkqueue()
     }
 }
 
-void comworker::getFdSet(fd_set& fds)
+void comworker::getFdSet(fd_set &fds)
 {
     FD_ZERO(&fds);
     for (std::map<size_t, tlinkptr>::iterator it = _socketmap.begin(); it != _socketmap.end(); ++it)
@@ -48,7 +61,7 @@ void comworker::getFdSet(fd_set& fds)
     }
 }
 
-void comworker::getWriteSet(fd_set& fds)
+void comworker::getWriteSet(fd_set &fds)
 {
     FD_ZERO(&fds);
     for (std::map<size_t, tlinkptr>::iterator it = _socketmap.begin(); it != _socketmap.end(); ++it)

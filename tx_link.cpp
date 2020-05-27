@@ -15,7 +15,7 @@
 
 size_t tlink::_linkidhead = 0;
 
-tlink::tlink(int s, bool blk) : _socket(s), _blockmode(blk), _state(eConnected), idletimes(0), _spos(0), _epos(0), _initized(false)
+tlink::tlink(int s, bool blk, std::string host, unsigned short port) : _socket(s), _server(host), _port(port), _blockmode(blk), _state(eConnected), idletimes(0), _spos(0), _epos(0), _initized(false)
 {
     _sendbuf.resize(send_buf_max);
     _recvbuf.resize(recvbuflen);

@@ -41,7 +41,7 @@ private:
 
 private:
     std::string _server;
-    std::string _port;
+    unsigned short _port;
     ConnState _state;
     int idletimes;
 
@@ -49,7 +49,7 @@ private:
     size_t _recvmsgcount; //接收到的消息数量
 
 public:
-    tlink(int s, bool blk);
+    tlink(int s, bool blk, std::string host, unsigned short port);
     virtual ~tlink();
 
 public:
@@ -72,6 +72,9 @@ private:
 public:
     void toString();
     size_t getId() { return _id; };
+
+    std::string PeerServer(){return _server;}
+    uint16_t PeerPort(){return _port;}
 
 public:
     int GetSocket() const;

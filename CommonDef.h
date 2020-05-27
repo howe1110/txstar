@@ -6,7 +6,9 @@ enum msgtype
 {
     msgtype_shakehand = 0,
     successor_req,
+    successor_req2,
     successor_rsp,
+    successor_nty,
     join_req,
     join_rsp,
     stabilize_req,

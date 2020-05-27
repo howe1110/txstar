@@ -1,3 +1,5 @@
+#pragma once
+
 #include "tx_worker.h"
 #include <sys/socket.h>
 class comworker;
@@ -12,8 +14,12 @@ private:
     comworker *_comworker;
 
 public:
-    listen_worker(/* args */);
+    listen_worker();
+    listen_worker(std::string& addr, std::string& port);
     ~listen_worker();
+
+public:
+    void set_port(std::string &port);
 
 public:
     void setcommwoker(comworker *cwk);

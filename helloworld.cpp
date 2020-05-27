@@ -84,6 +84,8 @@ void joinFunc(const std::vector<std::string> &paras)
         std::cout << "Invalid parameters." << std::endl;
         return;
     }
+
+    StarNode::instance().StartJoin(paras[0], paras[1]);
 }
 
 void checkFunc(const std::vector<std::string> &paras)
@@ -206,14 +208,16 @@ void Wait2ExitApp()
 
 int main()
 {
-    if (-1 == daemon(1, 1))
+/*     if (-1 == daemon(1, 1))
     {
         logerr("Failed daemonizing");
         return 1;
-    }
+    } */
     logerr("tx service is starting.");
     InitAppEnv();
     start();
+    startshell();
+    bRunning = false;
     Wait2ExitApp();
     return 0;
 }
